@@ -7,14 +7,8 @@ The application is built with a modern full-stack architecture, separating front
 
 ## 📁 Project Structure
 
-civic-connect/
-│
-├── frontend/ # React frontend application
-├── backend/ # Node.js / Express backend server
-├── shared/ # Shared utilities, constants, helpers
-│
-├── package.json
-└── README.md
+<img width="295" height="591" alt="image" src="https://github.com/user-attachments/assets/ac5874a2-f518-4203-ba7a-0d3d841e1af1" />
+
 
 
 ---
