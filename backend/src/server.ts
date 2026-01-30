@@ -6,6 +6,7 @@ import connectDB from "./config/db";
 
 // ✅ IMPORT ROUTES (VERY IMPORTANT)
 import authRoutes from "./routes/auth";
+import adminRoutes from "./routes/admin.routes";
 import userRoutes from "./users/user.routes";
 import issueRoutes from "./issues/issue.routes";
 import analyticsRoutes from "./routes/analytics.routes";
@@ -30,6 +31,7 @@ app.use("/api/users", userRoutes);
 
 // 🧾 ISSUES (CITIZEN / AUTHORITY)
 app.use("/api/issues", issueRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/analytics", analyticsRoutes);
 
