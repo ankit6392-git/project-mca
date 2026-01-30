@@ -1,10 +1,18 @@
-import AuditLog from "../models/AuditLog";
 import { Request, Response } from "express";
+import AuditLog from "../models/auditLog.model";
 
-export const getAuditLogs = async (_req: Request, res: Response) => {
-  const logs = await AuditLog.find()
-    .sort({ createdAt: -1 })
-    .limit(50);
+/**
+ * GET AUDIT LOGS
+ * /api/admin/audit-logs
+ */
+export const getAuditLogs = async (req: Request, res: Response) => {
+  try {
+    const logs = await AuditLog.find().sort({ createdAt: -1 });
 
-  res.json(logs);
+    res.status(200).json({
+      logs,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch audit logs" });
+  }
 };

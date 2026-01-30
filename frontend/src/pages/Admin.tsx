@@ -464,6 +464,7 @@
 //     </>
 //   );
 // }
+
 import { useEffect, useState } from "react";
 import { api } from "../services/api";
 import Navbar from "../components/common/Navbar";
@@ -480,116 +481,219 @@ export default function Admin() {
   const [page, setPage] = useState(1);
   const limit = 5;
   const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
 
-  const fetchAnalytics = () =>
-    api.get("/analytics").then((res) => setAnalytics(res.data));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchUsers = () =>
-    api
-      .get(`/users?page=${page}&limit=${limit}`)
-      .then((res) => {
-        setUsers(res.data.users);
-        setTotalPages(res.data.totalPages);
-      });
+  // ================= API =================
+  const fetchAnalytics = async () => {
+    try {
+      const res = await api.get("/analytics");
+      setAnalytics(res.data || null);
+    } catch {
+      setAnalytics(null);
+    }
+  };
 
-  const fetchAuditLogs = () =>
-    api.get("/admin/audit-logs").then((res) => setAuditLogs(res.data));
+  const fetchUsers = async () => {
+    const res = await api.get(`/users?page=${page}&limit=${limit}`);
 
+    setUsers(res.data.users ?? res.data ?? []);
+    setTotalUsers(
+      res.data.totalUsers ??
+      (Array.isArray(res.data) ? res.data.length : 0)
+    );
+    setTotalPages(res.data.totalPages ?? 1);
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await api.get("/admin/audit-logs");
+      setAuditLogs(Array.isArray(res.data.logs) ? res.data.logs : []);
+    } catch {
+      setAuditLogs([]);
+    }
+  };
+
+  // ================= ACTIONS =================
+  const handleRoleUpdate = async (userId: string, currentRole: string) => {
+    const newRole =
+      currentRole === "citizen" ? "authority" : "citizen";
+
+    try {
+      await api.put(`/admin/users/${userId}/role`, { role: newRole });
+      alert(`Role updated to ${newRole}`);
+      fetchUsers();
+    } catch {
+      alert("Failed to update role");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this user?"
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      alert("User deleted successfully");
+      fetchUsers();
+    } catch {
+      alert("Failed to delete user");
+    }
+  };
+
+  const handleDepartmentUpdate = async (
+    userId: string,
+    department: string
+  ) => {
+    try {
+      await api.put(`/admin/users/${userId}/department`, { department });
+      alert("Department updated successfully");
+      fetchUsers();
+    } catch {
+      alert("Failed to update department");
+    }
+  };
+
+  // ================= EFFECT =================
   useEffect(() => {
-    fetchAnalytics();
-    fetchUsers();
-    fetchAuditLogs();
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        await Promise.all([
+          fetchAnalytics(),
+          fetchUsers(),
+          fetchAuditLogs(),
+        ]);
+      } catch {
+        setError("Failed to load admin data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [page]);
 
+  // ================= UI =================
   return (
     <>
       <Navbar />
 
-      <div className="bg-gray-100 min-h-screen p-6">
+      <div className="bg-gray-100 min-h-screen p-6 text-black">
         <div className="max-w-7xl mx-auto space-y-8">
 
-          {/* ADMIN PROFILE */}
+          {/* ADMIN INFO */}
           {user && (
             <div className="bg-white p-6 rounded shadow">
-              <h2 className="text-lg font-semibold">
-                Admin: {user.name}
+              <h2 className="text-xl font-semibold text-gray-800">
+                Admin Dashboard
               </h2>
-              <p className="text-sm text-gray-600">{user.email}</p>
+              <p className="text-sm mt-1">
+                {user.name} • {user.email}
+              </p>
             </div>
           )}
 
-          {/* ANALYTICS */}
-          {analytics && <AdminCharts data={analytics} />}
-
           {/* USERS */}
           <div className="bg-white p-6 rounded shadow">
-            <h2 className="text-xl font-semibold mb-4">
-              Manage Users
-            </h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-800">
+                Manage Users
+              </h2>
+              <span className="text-sm font-medium">
+                Total Users:{" "}
+                <span className="font-semibold">{totalUsers}</span>
+              </span>
+            </div>
 
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left py-2 px-2">Name</th>
+                  <th className="text-left py-2 px-2">Email</th>
+                  <th className="text-left py-2 px-2">Role</th>
+                  <th className="text-left py-2 px-2">Department</th>
+                  <th className="text-left py-2 px-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users
                   .filter((u) => u.role !== "admin")
                   .map((u) => (
-                    <tr key={u._id} className="border-b">
-                      <td>{u.name}</td>
-                      <td>{u.email}</td>
-                      <td>{u.role}</td>
+                    <tr key={u._id} className="border-b hover:bg-gray-50">
+                      <td className="py-2 px-2">{u.name}</td>
+                      <td className="py-2 px-2">{u.email}</td>
+                      <td className="py-2 px-2 capitalize">{u.role}</td>
+
+                      {/* 🔽 DEPARTMENT DROPDOWN */}
+                      <td className="py-2 px-2">
+                        {u.role === "authority" ? (
+                          <select
+                            value={u.department || ""}
+                            onChange={(e) =>
+                              handleDepartmentUpdate(u._id, e.target.value)
+                            }
+                            className="border px-2 py-1 rounded text-sm"
+                          >
+                            <option value="">Select</option>
+                            <option value="water">Water</option>
+                            <option value="road">Road</option>
+                            <option value="electricity">Electricity</option>
+                          </select>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+
+                      <td className="py-2 px-2 space-x-2">
+                        <button
+                          onClick={() => handleRoleUpdate(u._id, u.role)}
+                          className="px-3 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          Update
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteUser(u._id)}
+                          className="px-3 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
               </tbody>
             </table>
-
-            {/* PAGINATION */}
-            <div className="flex justify-between mt-4">
-              <button
-                disabled={page === 1}
-                onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </button>
-              <span>
-                Page {page} of {totalPages}
-              </span>
-              <button
-                disabled={page === totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </button>
-            </div>
           </div>
 
           {/* AUDIT LOGS */}
           <div className="bg-white p-6 rounded shadow">
-            <h2 className="text-xl font-semibold mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
               Audit Logs
             </h2>
 
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b">
-                  <th>Time</th>
-                  <th>Admin</th>
-                  <th>Action</th>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left py-2 px-2">Time</th>
+                  <th className="text-left py-2 px-2">Admin</th>
+                  <th className="text-left py-2 px-2">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {auditLogs.map((log) => (
                   <tr key={log._id} className="border-b">
-                    <td>
+                    <td className="py-2 px-2">
                       {new Date(log.createdAt).toLocaleString()}
                     </td>
-                    <td>{log.adminName}</td>
-                    <td>{log.action}</td>
+                    <td className="py-2 px-2">{log.adminName}</td>
+                    <td className="py-2 px-2">{log.action}</td>
                   </tr>
                 ))}
               </tbody>
