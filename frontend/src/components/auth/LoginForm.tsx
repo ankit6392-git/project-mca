@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -31,10 +32,21 @@ export default function LoginForm() {
       <motion.button
         whileHover={{ scale: 1.03 }}
         whileTap={{ scale: 0.96 }}
-        className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold"
+        className="w-full py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 font-semibold text-white"
       >
         Login
       </motion.button>
+
+      {/* 🔹 New member link */}
+      <p className="text-center text-sm text-gray-600">
+        New member?{" "}
+        <Link
+          to="/register"
+          className="text-indigo-600 hover:underline font-medium"
+        >
+          Join now
+        </Link>
+      </p>
     </form>
   );
 }
