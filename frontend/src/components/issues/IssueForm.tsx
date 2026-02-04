@@ -4,16 +4,20 @@ import { api } from "../../services/api";
 /**
  * IssueForm
  * ---------
- * Allows citizen to register a new complaint
- * - Image upload (max 5MB)
- * - Auto-detect location
+ * Manual location entry (no auto fetch)
  */
 export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [department, setDepartment] = useState("water");
+
+  // 📍 Location fields
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [zip, setZip] = useState("");
+
   const [image, setImage] = useState<File | null>(null);
-  const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
 
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -23,14 +27,23 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
     setLoading(true);
 
     try {
+      // ✅ Combine location into one string
+      const location = `${address}, ${city}, ${state} - ${zip}`;
+
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
       formData.append("department", department);
       formData.append("location", location);
-      if (image) formData.append("image", image);
 
-      await api.post("/issues/create", formData, {
+      // ✅ backend requires this
+      formData.append("zipCode", zip);
+
+      if (image) {
+        formData.append("image", image);
+      }
+
+      await api.post("/issues", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -38,12 +51,30 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
       setTitle("");
       setDescription("");
       setDepartment("water");
+      setAddress("");
+      setCity("");
+      setState("");
+      setZip("");
       setImage(null);
-      setLocation("");
 
       onSuccess();
-    } catch (error) {
-      alert("Failed to register complaint");
+    } catch (error: any) {
+      if (error.response?.status === 409) {
+        const existing = error.response.data.existingComplaint;
+
+        alert(
+          `This issue already exists.\n\n` +
+            `Complaint ID: ${existing.complaintId}\n` +
+            `Current Status: ${existing.status}\n` +
+            `Priority: ${existing.priority}\n\n` +
+            `You are now linked to the same ticket.`
+        );
+
+        // 🔁 refresh dashboard so shared complaint appears
+        onSuccess();
+      } else {
+        alert("Failed to register complaint");
+      }
     } finally {
       setLoading(false);
     }
@@ -58,7 +89,6 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
         Register New Complaint
       </h2>
 
-      {/* Title */}
       <input
         type="text"
         placeholder="Issue title"
@@ -68,7 +98,6 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
         required
       />
 
-      {/* Description */}
       <textarea
         placeholder="Describe the issue"
         className="w-full border p-2 rounded text-black"
@@ -78,7 +107,48 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
         required
       />
 
-      {/* Image Upload */}
+      <input
+        type="text"
+        placeholder="Address / Area"
+        className="w-full border p-2 rounded text-black"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        required
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <input
+          type="text"
+          placeholder="City"
+          className="border p-2 rounded text-black"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          required
+        />
+
+        <input
+          type="text"
+          placeholder="State"
+          className="border p-2 rounded text-black"
+          value={state}
+          onChange={(e) => setState(e.target.value)}
+          required
+        />
+
+        <input
+          type="text"
+          placeholder="ZIP / PIN Code"
+          className="border p-2 rounded text-black"
+          value={zip}
+          onChange={(e) => {
+            if (/^\d{0,6}$/.test(e.target.value)) {
+              setZip(e.target.value);
+            }
+          }}
+          required
+        />
+      </div>
+
       <input
         type="file"
         accept="image/*"
@@ -97,71 +167,6 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
         }}
       />
 
-      {/* Location */}
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Location"
-          value={location}
-          className="border p-2 rounded text-black flex-1"
-          readOnly
-        />
-
-        <button
-  type="button"
-  className="bg-blue-600 text-white px-4 py-2 rounded"
-  onClick={() => {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-
-        try {
-          const response = await fetch(
-            `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=YOUR_GOOGLE_MAPS_KEY`
-          );
-
-          const data = await response.json();
-
-          if (data.status === "OK" && data.results.length > 0) {
-            setLocation(data.results[0].formatted_address);
-          } else {
-            alert("Unable to fetch address from location");
-          }
-        } catch (err) {
-          alert("Error while fetching location");
-        }
-      },
-      (error) => {
-        // 👇 THIS WAS MISSING
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            alert("Location permission denied");
-            break;
-          case error.POSITION_UNAVAILABLE:
-            alert("Location information unavailable");
-            break;
-          case error.TIMEOUT:
-            alert("Location request timed out");
-            break;
-          default:
-            alert("Failed to fetch location");
-        }
-      }
-    );
-  }}
->
-  Fetch Location
-</button>
-
-      </div>
-
-      {/* Department */}
       <select
         className="w-full border p-2 rounded text-black"
         value={department}
@@ -178,10 +183,9 @@ export default function IssueForm({ onSuccess }: { onSuccess: () => void }) {
         <option value="other">Other</option>
       </select>
 
-      {/* Submit */}
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || zip.length !== 6}
         className="bg-blue-600 text-white px-6 py-2 rounded"
       >
         {loading ? "Submitting..." : "Submit Complaint"}

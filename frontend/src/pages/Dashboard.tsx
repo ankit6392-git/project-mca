@@ -3,8 +3,11 @@ import { api } from "../services/api";
 import Navbar from "../components/common/Navbar";
 import IssueForm from "../components/issues/IssueForm";
 import CitizenChart from "../components/citizen/CitizenChart";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+
   const [issues, setIssues] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -29,13 +32,31 @@ export default function Dashboard() {
     }
   };
 
-  const filteredIssues = issues.filter((i) =>
-    statusFilter === "all" ? true : i.status === statusFilter
-  );
+  const priorityColor = (priority: string) => {
+    if (priority === "HIGH") return "bg-red-200 text-red-800";
+    if (priority === "MEDIUM") return "bg-yellow-200 text-yellow-800";
+    return "bg-green-200 text-green-800";
+  };
 
-  const finalIssues = filteredIssues.filter((i) =>
-    i.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredIssues = issues
+    .filter((i) =>
+      statusFilter === "all" ? true : i.status === statusFilter
+    )
+    .filter((i) =>
+      i.title.toLowerCase().includes(search.toLowerCase())
+    );
+
+  const followTicket = async (id: string) => {
+    try {
+      await api.post(`/issues/${id}/follow`);
+      setToast("You are now following this ticket");
+      fetchIssues();
+      setTimeout(() => setToast(""), 3000);
+    } catch (err: any) {
+      setToast(err.response?.data?.message || "Already following");
+      setTimeout(() => setToast(""), 3000);
+    }
+  };
 
   return (
     <>
@@ -49,7 +70,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Page Header */}
+        {/* Header */}
         <div className="max-w-7xl mx-auto mb-6">
           <h1 className="text-2xl font-bold text-black">
             Citizen Dashboard
@@ -99,52 +120,88 @@ export default function Dashboard() {
 
         {/* Issue List */}
         <div className="max-w-7xl mx-auto grid gap-5">
-          {finalIssues.map((issue) => (
-            <div
-              key={issue._id}
-              className="bg-white p-5 rounded shadow border-l-4 border-blue-600"
-            >
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold text-black">
-                  {issue.title}
-                </h3>
-                <span
-                  className={`text-xs px-3 py-1 rounded-full ${statusColor(
-                    issue.status
-                  )}`}
-                >
-                  {issue.status}
-                </span>
-              </div>
+          {filteredIssues.map((issue) => {
+            const isFollowing =
+              issue.relatedUsers?.includes(user?.id);
 
-              <p className="text-sm text-gray-700">
-                {issue.description}
-              </p>
+            return (
+              <div
+                key={issue._id}
+                className="bg-white p-5 rounded shadow border-l-4 border-blue-600"
+              >
+                {/* Complaint ID */}
+                <p className="text-xs text-gray-500 mb-1">
+                  Complaint ID: <b>{issue.complaintId}</b>
+                </p>
 
-              <div className="text-xs text-gray-500 mt-2">
-                📅 Registered on:{" "}
-                {new Date(issue.createdAt).toLocaleString()}
-              </div>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="font-semibold text-black">
+                    {issue.title}
+                  </h3>
 
-              <div className="text-xs text-gray-700 mt-1">
-                🏢 <b>Department:</b> {issue.department}
-              </div>
+                  <div className="flex gap-2">
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full ${statusColor(
+                        issue.status
+                      )}`}
+                    >
+                      {issue.status}
+                    </span>
 
-              {issue.location && (
-                <div className="text-xs text-gray-700 mt-1">
-                  📍 <b>Location:</b> {issue.location}
+                    <span
+                      className={`text-xs px-3 py-1 rounded-full ${priorityColor(
+                        issue.priority
+                      )}`}
+                    >
+                      {issue.priority}
+                    </span>
+                  </div>
                 </div>
-              )}
 
-              {issue.image && (
-                <img
-                  src={issue.image}
-                  alt="issue"
-                  className="mt-3 w-40 rounded border"
-                />
-              )}
-            </div>
-          ))}
+                <p className="text-sm text-gray-700">
+                  {issue.description}
+                </p>
+
+                <div className="text-xs text-gray-500 mt-2">
+                  📅 Registered on:{" "}
+                  {new Date(issue.createdAt).toLocaleString()}
+                </div>
+
+                <div className="text-xs text-gray-700 mt-1">
+                  🏢 <b>Department:</b> {issue.department}
+                </div>
+
+                {issue.location && (
+                  <div className="text-xs text-gray-700 mt-1">
+                    📍 <b>Location:</b> {issue.location}
+                  </div>
+                )}
+
+                {issue.image && (
+                  <img
+                    src={issue.image}
+                    alt="issue"
+                    className="mt-3 w-40 rounded border"
+                  />
+                )}
+
+                {/* Follow Button */}
+                <div className="mt-3">
+                  <button
+                    disabled={isFollowing}
+                    onClick={() => followTicket(issue._id)}
+                    className={`px-4 py-1 rounded text-sm ${
+                      isFollowing
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    {isFollowing ? "Following" : "Follow Ticket"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     </>
