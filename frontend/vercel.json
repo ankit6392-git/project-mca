@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "name": "civic-connect-frontend",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
