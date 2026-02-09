@@ -55,7 +55,7 @@ import dotenv from "dotenv";
 
 import connectDB from "./config/db";
 
-// ✅ IMPORT ROUTES (VERY IMPORTANT)
+// ROUTES
 import authRoutes from "./routes/auth";
 import adminRoutes from "./routes/admin.routes";
 import userRoutes from "./users/user.routes";
@@ -66,36 +66,48 @@ dotenv.config();
 
 const app = express();
 
+// ------------------ CORS (🔥 FIXED) ------------------
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",              // local frontend
+      "https://civicconnect-mca.vercel.app" // deployed frontend
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+  })
+);
+
+// allow preflight requests
+app.options("*", cors());
+
 // ------------------ MIDDLEWARES ------------------
-app.use(cors());
-app.use(express.json()); // 🔥 REQUIRED for JSON body parsing
+app.use(express.json());
 
 // ------------------ DATABASE ------------------
 connectDB();
 
 // ------------------ ROUTES ------------------
-// 🔐 AUTH ROUTES
 app.use("/api/auth", authRoutes);
-
-// 👥 USERS (ADMIN ONLY)
 app.use("/api/users", userRoutes);
-
-// 🧾 ISSUES (CITIZEN / AUTHORITY)
 app.use("/api/issues", issueRoutes);
 app.use("/api/admin", adminRoutes);
-
 app.use("/api/analytics", analyticsRoutes);
 
+// ------------------ ERROR HANDLER ------------------
 app.use((err: any, _req: any, res: any, _next: any) => {
-  if (err.message.includes("File too large")) {
+  if (err.message?.includes("File too large")) {
     return res.status(400).json({ message: "Image must be under 5MB" });
   }
-
   res.status(500).json({ message: err.message });
 });
 
-
-// ------------------ SERVER ------------------
-app.listen(5000, () => {
-  console.log("✅ Server running on port 5000");
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
 });
+
+// ------------------ EXPORT FOR VERCEL ------------------
+export default app;
